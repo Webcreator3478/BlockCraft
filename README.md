@@ -249,11 +249,13 @@ Both executables also read the `RUST_LOG` environment variable to choose what th
 
 # Licenses
 
-BlockCraft has two licenses, one for the code and one for the assets. The full texts are in the [`License`](https://github.com/Webcreator3478/BlockCraft/tree/main/License) folder of the repository.
+BlockCraft has a comprehensive End User License Agreement (EULA) and separate licenses for code and assets. The full texts can be found in the [`License`](https://github.com/Webcreator3478/BlockCraft/tree/main/License) folder of the repository.
+
+## End User License Agreement (EULA)
+The complete terms governing the use of this software are outlined in the [LICENSE.md](https://github.com/Webcreator3478/BlockCraft/blob/main/LICENSE.md) file (which serves as our EULA). By downloading, installing, or using BlockCraft, you agree to its terms.
 
 ## Software License
-
-The code is covered by the [Software License](https://github.com/Webcreator3478/BlockCraft/blob/main/License/Software-License.md), Copyright (c) 2026 BlockCraft Contributors. You may use, copy, modify, merge, publish, distribute and sublicense the software, under these conditions:
+The core code is covered by the [Software License](https://github.com/Webcreator3478/BlockCraft/blob/main/License/Software-License.md), Copyright (c) 2026 BlockCraft Contributors. You may use, copy, modify, merge, publish, distribute and sublicense the software, under these conditions:
 
 - **No direct sale:** you may not sell, rent, lease or monetize the core BlockCraft software, engine or official standalone binaries for commercial gain.
 - **Modding exception:** creators, modders and developers may create and distribute their own independent mods, plugins, custom resource packs or add-ons, and may charge for them if they wish, as long as they do not bundle, incorporate or sell the core BlockCraft engine itself.
@@ -263,7 +265,6 @@ The code is covered by the [Software License](https://github.com/Webcreator3478/
 The software is provided "as is", without warranty of any kind.
 
 ## Assets License
-
 The visual assets, textures and UI elements are covered by the [Assets License](https://github.com/Webcreator3478/BlockCraft/blob/main/License/Assets-License.md). They are derived from, and subject to, the original terms of their creators, which are archived in the `Originals/` folder of the repository.
 
 - **Pixel Perfection (CC BY-SA 4.0):** some textures come from the resource pack "Pixel Perfection" by XSSheep, licensed under the [Creative Commons Attribution-Share Alike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/). You may share and adapt them if you give appropriate credit to the original authors, and anything you build on them must be distributed under the same CC BY-SA 4.0 license.
