@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use super::{GameElementId, ItemId, Tool, ToolKind};
-use bevy::math::{bounding::Aabb3d, IVec3, Vec3A};
+use bevy_shape::bounding::Aabb3d;
+use bevy::math::{IVec3, Vec3A};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 

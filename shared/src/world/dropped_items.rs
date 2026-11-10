@@ -1,7 +1,8 @@
 //! The items lying in the world, such as the ones a broken block drops. The server simulates
 //! them and tells the clients where they are.
 
-use bevy::math::{bounding::Aabb3d, Vec3};
+use bevy_shape::bounding::Aabb3d;
+use bevy::math::Vec3;
 use serde::{Deserialize, Serialize};
 
 use crate::players::{constants::GRAVITY, movement::is_terrain_loaded};

@@ -1,4 +1,5 @@
-use bevy::math::{bounding::Aabb3d, Vec3};
+use bevy_shape::bounding::Aabb3d;
+use bevy::math::Vec3;
 
 use crate::world::ChunkMap;
 

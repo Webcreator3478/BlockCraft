@@ -1,5 +1,6 @@
+use bevy_shape::bounding::Aabb3d;
 use bevy::{
-    math::{bounding::Aabb3d, IVec3, Vec3},
+    math::{IVec3, Vec3},
     transform::components::Transform,
 };
 

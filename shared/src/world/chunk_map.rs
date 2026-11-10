@@ -1,6 +1,7 @@
 use bevy_platform::collections::{HashMap, HashSet};
 
-use bevy::math::{bounding::Aabb3d, IVec3, Vec3};
+use bevy_shape::bounding::Aabb3d;
+use bevy::math::{IVec3, Vec3};
 
 use crate::world::{
     global_block_to_chunk_pos, to_local_pos, BlockData, BlockHitbox, BlockId, BlockTransparency,
