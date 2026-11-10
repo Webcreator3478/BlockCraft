@@ -1,6 +1,6 @@
 # BlockCraft
 
-Minecraft game clone written in Rust, using the Bevy game engine.
+Minecraft game clone written in Rust, using the Bevy game engine (migrated to Bevy 0.20).
 
 <br>
 
