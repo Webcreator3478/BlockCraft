@@ -2,7 +2,7 @@ use crate::camera::{CameraController, Zoom};
 use crate::player::*;
 use crate::ui::hud::UIMode;
 use crate::world::ClientWorldMap;
-use bevy::math::bounding::Aabb3d;
+use bevy_shape::bounding::Aabb3d;
 use bevy::{input::mouse::MouseMotion, prelude::*, window::PrimaryWindow};
 use shared::players::ViewMode;
 use shared::world::ChunkMap;

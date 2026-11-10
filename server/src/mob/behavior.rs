@@ -5,8 +5,9 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
+use bevy_shape::bounding::Aabb3d;
 use bevy::{
-    math::{bounding::Aabb3d, ops::atan2, IVec3, Quat, Vec3},
+    math::{ops::atan2, IVec3, Quat, Vec3},
     time::{Fixed, Time},
 };
 use bevy_ecs::system::{Res, ResMut};
