@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # system_clipboard: the text fields copy and paste through the clipboard of the system, not one of
 # their own
-bevy = { version = "=0.19.1", features = ["serialize", "system_clipboard"] }
+bevy = { version = "=0.20.0", features = ["serialize", "system_clipboard"] }
 # The accessibility roles of the widgets, which Bevy does not re-export
 accesskit = "0.24"
 rand = "0.8.5"
