@@ -52,7 +52,7 @@ fn set_volume(
 /// Saves the volumes when the button is released on a slider: a click on the track sets a value
 /// that the widget never reports as final.
 fn save_on_release(
-    _: On<Pointer<Release>>,
+    _: On<PointerRelease>,
     settings: Res<AudioSettings>,
     paths: Res<GameFolderPaths>,
 ) {
