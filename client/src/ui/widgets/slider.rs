@@ -219,7 +219,7 @@ fn percent_label(value: f32) -> String {
 /// A notch of the wheel, or enough trackpad pixels, over the slider moves it by a step, up
 /// raising it, and nothing else scrolls. A disabled slider lets the scroll go to its ancestors.
 fn wheel_steps(
-    mut scroll: On<Pointer<Scroll>>,
+    mut scroll: On<PointerScroll>,
     mut sliders: Query<&mut WheelRemainder, Without<InteractionDisabled>>,
     mut commands: Commands,
 ) {
