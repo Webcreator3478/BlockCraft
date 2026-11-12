@@ -94,7 +94,7 @@ pub fn update_craftable_now(
     } else {
         Vec::new()
     };
-    now.set_if_different(CraftableNow { survival, items });
+    now.set_if_neq(CraftableNow { survival, items });
 }
 
 /// Lays the browser out for the window, which `HudBottom` covers, and the inventory panel.
@@ -109,7 +109,7 @@ pub fn layout_item_browser(
     if window.x <= 0.0 || inventory_width <= 0.0 {
         return;
     }
-    layout.set_if_different(browser_layout(window, inventory_width));
+    layout.set_if_neq(browser_layout(window, inventory_width));
 }
 
 /// Shows the icon of each new slot of the catalog or of a card, and the count of an output: their
@@ -123,7 +123,7 @@ pub fn show_item_icons(
     for (children, recipe_slot) in &slots {
         for child in children.iter() {
             if let Ok(mut visibility) = icons.get_mut(child) {
-                visibility.set_if_different(Visibility::Inherited);
+                visibility.set_if_neq(Visibility::Inherited);
             }
             if let (Ok(mut text), Some(slot)) = (counts.get_mut(child), recipe_slot) {
                 text.0 = slot_count_label(slot.count);
@@ -324,15 +324,15 @@ pub fn show_item_browser(
     let shown = open && (!layout.compact || state.drawer_open);
     let handle_shown = open && layout.compact && !state.drawer_open;
     let (handle_visibility, handle_index) = &mut *handle;
-    handle_visibility.set_if_different(if handle_shown {
+    handle_visibility.set_if_neq(if handle_shown {
         Visibility::Inherited
     } else {
         Visibility::Hidden
     });
-    handle_index.set_if_different(TabIndex(if handle_shown { 0 } else { -1 }));
+    handle_index.set_if_neq(TabIndex(if handle_shown { 0 } else { -1 }));
 
     let (node, visibility) = &mut *panel;
-    visibility.set_if_different(if shown {
+    visibility.set_if_neq(if shown {
         Visibility::Inherited
     } else {
         Visibility::Hidden
@@ -371,7 +371,7 @@ pub fn show_item_browser(
         } else {
             shown && in_recipe_view == in_view && node.display != Display::None
         };
-        index.set_if_different(TabIndex(if stop { 0 } else { -1 }));
+        index.set_if_neq(TabIndex(if stop { 0 } else { -1 }));
     }
 }
 
@@ -717,11 +717,11 @@ pub fn style_chips(
         if is_back {
             text = TEXT;
         }
-        background.set_if_different(BackgroundColor(fill));
-        border.set_if_different(edge);
+        background.set_if_neq(BackgroundColor(fill));
+        border.set_if_neq(edge);
         for child in children.iter() {
             if let Ok(mut color) = texts.get_mut(child) {
-                color.set_if_different(TextColor(text));
+                color.set_if_neq(TextColor(text));
             }
         }
         // Read by screen readers as the toggled state of the button
