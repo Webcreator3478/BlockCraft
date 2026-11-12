@@ -32,7 +32,9 @@ use bevy::render::{
     renderer::{RenderContext, RenderDevice, RenderQueue, ViewQuery},
     storage::{GpuShaderBuffer, ShaderBuffer},
     texture::GpuImage,
-    view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget, ViewUniformOffset, ViewUniforms},
+    view::{
+        ExtractedView, Msaa, ViewDepthStencilTexture, ViewTarget, ViewUniformOffset, ViewUniforms,
+    },
     GpuResourceAppExt, Render, RenderApp, RenderSystems,
 };
 use bevy::shader::Shader;
@@ -44,6 +46,7 @@ const PRECIPITATION_SHADER: Handle<Shader> = uuid_handle!("a4c7e2d9-58b1-4f03-9e
 /// Marks the camera that the rain and the snow are drawn for: the camera of the player, whose
 /// depth texture is made readable for them.
 #[derive(Component, Clone, Copy, Default, ExtractComponent)]
+#[extract_app(RenderApp)]
 pub struct PrecipitationView;
 
 /// How many drops of each kind the pass draws at most, and of them how many to show: the
@@ -77,6 +80,7 @@ impl PrecipitationParams {
 /// world: the weather, the climate map, the occlusion map, and the drops. `None` while nothing
 /// falls, or nothing is seen: the pass then draws nothing.
 #[derive(Resource, Clone, Default, ExtractResource)]
+#[extract_app(RenderApp)]
 pub struct PrecipitationDraw(pub Option<PrecipitationSources>);
 
 #[derive(Clone, Debug, PartialEq)]
@@ -187,6 +191,7 @@ impl SpecializedRenderPipeline for PrecipitationPipeline {
                 shader_defs: shader_defs.clone(),
                 entry_point: Some("vertex".into()),
                 buffers: vec![],
+                constants: vec![],
             },
             fragment: Some(FragmentState {
                 shader: PRECIPITATION_SHADER,
@@ -198,6 +203,7 @@ impl SpecializedRenderPipeline for PrecipitationPipeline {
                     blend: Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING),
                     write_mask: ColorWrites::COLOR,
                 })],
+                constants: vec![],
             }),
             primitive: PrimitiveState {
                 cull_mode: None,
@@ -253,10 +259,15 @@ fn prepare_precipitation_bind_groups(
     images: Res<RenderAssets<GpuImage>>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    views: Query<(Entity, &ViewDepthTexture, &Msaa), With<PrecipitationView>>,
+    views: Query<(Entity, &ViewDepthStencilTexture, &Msaa), With<PrecipitationView>>,
 ) {
     let sources = draw.as_ref().and_then(|draw| draw.0.as_ref());
     for (entity, depth, msaa) in &views {
+        // the depth of the view, which a view without one cannot draw with
+        let Some(depth_view) = depth.attachment.depth_stencil_views().depth_only_view() else {
+            commands.entity(entity).remove::<PrecipitationBindGroup>();
+            continue;
+        };
         let resources = sources.and_then(|sources| {
             Some((
                 sources,
@@ -291,7 +302,7 @@ fn prepare_precipitation_bind_groups(
                 params,
                 &occlusion.texture_view,
                 &climate.texture_view,
-                depth.view(),
+                depth_view,
             )),
         );
         commands.entity(entity).insert(PrecipitationBindGroup {
