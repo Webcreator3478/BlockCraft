@@ -27,7 +27,9 @@ use bevy::render::{
         UniformBuffer, VertexState,
     },
     renderer::{RenderContext, RenderDevice, RenderQueue, ViewQuery},
-    view::{ExtractedView, Msaa, ViewDepthTexture, ViewTarget, ViewUniformOffset, ViewUniforms},
+    view::{
+        ExtractedView, Msaa, ViewDepthStencilTexture, ViewTarget, ViewUniformOffset, ViewUniforms,
+    },
     GpuResourceAppExt, Render, RenderApp, RenderSystems,
 };
 use bevy::shader::Shader;
@@ -71,6 +73,7 @@ const LDR_BRIGHTNESS: [f32; 2] = [1.6, 0.75];
 /// The points the pass draws, kept up to date in the main world and handed to the render world.
 /// `None` while no bolt is seen: the pass then draws nothing.
 #[derive(Resource, Clone, Default, ExtractResource)]
+#[extract_app(RenderApp)]
 pub struct LightningDraw(pub Option<(Vec<BoltVertex>, LightningParams)>);
 
 /// The points of the bolts of `lightning` now, every channel after the other, the branches
@@ -238,6 +241,7 @@ impl SpecializedRenderPipeline for LightningPipeline {
                 shader_defs: shader_defs.clone(),
                 entry_point: Some("vertex".into()),
                 buffers: vec![],
+                constants: vec![],
             },
             fragment: Some(FragmentState {
                 shader: LIGHTNING_SHADER,
@@ -251,6 +255,7 @@ impl SpecializedRenderPipeline for LightningPipeline {
                     }),
                     write_mask: ColorWrites::COLOR,
                 })],
+                constants: vec![],
             }),
             primitive: PrimitiveState {
                 cull_mode: None,
@@ -306,7 +311,7 @@ fn prepare_lightning_bind_groups(
     view_uniforms: Res<ViewUniforms>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    views: Query<(Entity, &ViewDepthTexture, &Msaa), With<PrecipitationView>>,
+    views: Query<(Entity, &ViewDepthStencilTexture, &Msaa), With<PrecipitationView>>,
 ) {
     let drawn = draw.as_ref().and_then(|draw| draw.0.as_ref());
     let Some((points, params)) = drawn else {
@@ -327,6 +332,11 @@ fn prepare_lightning_bind_groups(
         return;
     };
     for (entity, depth, msaa) in &views {
+        // the depth of the view, which a view without one cannot draw with
+        let Some(depth_view) = depth.attachment.depth_stencil_views().depth_only_view() else {
+            commands.entity(entity).remove::<LightningBindGroup>();
+            continue;
+        };
         let layout = if msaa.samples() > 1 {
             &pipeline.multisampled_layout
         } else {
@@ -339,7 +349,7 @@ fn prepare_lightning_bind_groups(
                 view.clone(),
                 params.clone(),
                 points_binding.clone(),
-                depth.view(),
+                depth_view,
             )),
         );
         commands.entity(entity).insert(LightningBindGroup {
