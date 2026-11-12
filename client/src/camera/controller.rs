@@ -88,7 +88,7 @@ pub fn camera_control_system(
     // The eyes go down with the body of a sneaking player
     let eyes = bodies
         .iter_many(children)
-        .next()
+        .find_map(Result::ok)
         .map_or(Vec3::Y * EYE_HEIGHT, |body| {
             body.translation + Vec3::Y * EYE_HEIGHT * body.scale.y
         });
