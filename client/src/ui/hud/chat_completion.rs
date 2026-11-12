@@ -14,7 +14,7 @@ use bevy::text::{
     detect_text_needs_rerender, EditableText, EditableTextSystems, LineBreak, TextEdit,
     TextLayoutInfo,
 };
-use bevy::ui::widget::{scroll_editable_text, update_editable_text_layout, TextScroll};
+use bevy::ui::widget::update_editable_text_layout;
 use bevy::ui::{UiGlobalTransform, UiSystems};
 use shared::commands::{complete, Completion, Suggestion};
 
@@ -44,10 +44,11 @@ pub fn chat_completion_plugin(app: &mut App) {
                 .chain()
                 .after(EditableTextSystems)
                 .before(detect_text_needs_rerender),
+            // the scroll of the field is set as its edits are applied, so only its layout is
+            // waited for
             place_the_ghost
                 .in_set(UiSystems::PostLayout)
-                .after(update_editable_text_layout)
-                .after(scroll_editable_text),
+                .after(update_editable_text_layout),
         )
             .run_if(in_state(GameState::Game)),
     );
@@ -548,7 +549,7 @@ fn place_the_ghost(
     inputs: Query<
         (
             &TextLayoutInfo,
-            &TextScroll,
+            &EditableText,
             &ComputedNode,
             &CommandCompletion,
         ),
@@ -565,14 +566,16 @@ fn place_the_ghost(
         (With<Ghost>, Without<ChatInput>),
     >,
 ) {
-    let Ok((info, scroll, field, completion)) = inputs.single() else {
+    let Ok((info, editable, field, completion)) = inputs.single() else {
         return;
     };
     let Ok((text, mut node, ghost, mut transform, mut visibility)) = ghosts.single_mut() else {
         return;
     };
-    // physical px, as the layout
-    let caret = info.cursor.map(|(_, rect)| rect.min.x - scroll.0.x);
+    // physical px, as the layout; the field is scrolled by the offset of its viewport
+    let caret = info
+        .cursor
+        .map(|(_, rect)| rect.min.x - editable.viewport.offset.x);
     let shown = match caret {
         Some(caret) if !text.0.is_empty() && completion.is_shown() => {
             let fits = caret + ghost.size().x <= field.size().x;
@@ -641,7 +644,7 @@ fn complete_on_keys(
 
 /// The pointer over a row chooses its suggestion.
 fn choose_on_hover(
-    over: On<Pointer<Over>>,
+    over: On<PointerOver>,
     rows: Query<&SuggestionRow>,
     mut completions: Query<&mut CommandCompletion>,
 ) {
@@ -657,7 +660,7 @@ fn choose_on_hover(
 
 /// A click on a row takes its suggestion.
 fn take_on_click(
-    click: On<Pointer<Click>>,
+    click: On<PointerClick>,
     rows: Query<&SuggestionRow>,
     mut fields: Query<(&mut EditableText, &CommandCompletion)>,
 ) {
