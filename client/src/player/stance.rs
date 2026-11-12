@@ -49,7 +49,11 @@ pub fn crouch_bodies_system(
             1.0
         };
         let mut children = bodies.iter_many_mut(children);
-        while let Some(mut body) = children.fetch_next() {
+        while let Some(body) = children.fetch_next() {
+            // the children that are not bodies are skipped
+            let Ok(mut body) = body else {
+                continue;
+            };
             if body.scale.y == target {
                 continue;
             }
