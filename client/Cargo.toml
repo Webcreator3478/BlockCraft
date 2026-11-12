@@ -10,7 +10,9 @@ bevy = { version = "=0.20.0", features = ["serialize", "system_clipboard"] }
 # The accessibility roles of the widgets, which Bevy does not re-export
 accesskit = "0.24"
 rand = "0.8.5"
-bevy_renet = "5.0"
+# Same compat crate as `shared`: keeps `bevy_shape::bounding::Aabb3d` working (see shared/Cargo.toml)
+bevy_shape = { path = "../shared/bevy_shape_compat", package = "bevy_shape_compat" }
+bevy_renet = "6.0"
 bincode = "1.3.3"
 serde = { version = "1.0", features = ["derive"] }
 ron = "0.6"
@@ -18,10 +20,10 @@ shared = { path = "../shared" }
 server = { path = "../server" }
 log = { version = "0.4", features = ["max_level_debug", "release_max_level_warn"] }
 clap = { version = "4.5.19", features = ["derive"] }
-bevy-inspector-egui = "0.37"
+bevy-inspector-egui = "0.38"
 # Enables bevy_egui's bevy_ui feature, which draws egui above Bevy UI (bevy-inspector-egui does not).
-bevy_egui = { version = "0.40", default-features = false, features = ["bevy_ui", "render"] }
-egui = "0.34"
+bevy_egui = { version = "0.43", default-features = false, features = ["bevy_ui", "render"] }
+egui = "0.36"
 # The local time of the chat messages: std has no time zone
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
