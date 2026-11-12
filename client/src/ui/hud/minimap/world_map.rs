@@ -310,7 +310,7 @@ pub fn spawn_world_map(commands: &mut Commands, assets: &AssetServer, map: &Worl
 
 /// Dragging the map moves it with the cursor, and stops it following the player.
 fn drag_world_map(
-    drag: On<Pointer<Drag>>,
+    drag: On<PointerDrag>,
     ui_scale: Res<UiScale>,
     map: Option<ResMut<WorldMap>>,
     player: Query<&Transform, With<CurrentPlayerMarker>>,
@@ -328,7 +328,7 @@ fn drag_world_map(
 
 /// The wheel zooms the map around the cursor: the point of the world under it stays there.
 fn zoom_world_map_with_the_wheel(
-    scroll: On<Pointer<Scroll>>,
+    scroll: On<PointerScroll>,
     ui_scale: Res<UiScale>,
     map: Option<ResMut<WorldMap>>,
     views: Query<&ComputedNode, With<WorldMapView>>,
@@ -345,7 +345,7 @@ fn zoom_world_map_with_the_wheel(
         return;
     }
     // the view starts at the top-left corner of the window
-    let anchor = scroll.pointer_location.position / ui_scale.0
+    let anchor = scroll.pointer.position / ui_scale.0
         - view_size(views.single().ok(), window.single().ok(), &ui_scale) / 2.0;
     let focus = map.focus.unwrap_or(player.translation.xz());
     let focus = zoom_focus(focus, anchor, map.block_px(), SCALES[scale]);
