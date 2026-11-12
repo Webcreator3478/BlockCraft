@@ -124,6 +124,7 @@ pub fn spawn_text_field(commands: &mut Commands, field: &TextField) -> TextField
                 selection_color: ACCENT.with_alpha(0.4),
                 unfocused_selection_color: Color::NONE,
                 selected_text_color: None,
+                selection_radius: 0.0,
             },
             TabIndex(0),
             // the role before the label: the label's default node must not win
