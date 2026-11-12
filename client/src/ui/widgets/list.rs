@@ -220,7 +220,7 @@ fn note_wheel_start(mut lists: Query<(&ScrollPosition, &mut ListWheel)>) {
 /// entity run before its own: the list is put where its step takes it from where it was. The
 /// pixels of a trackpad move it by as many pixels, as Bevy did.
 fn wheel_by_step(
-    scroll: On<Pointer<Scroll>>,
+    scroll: On<PointerScroll>,
     mut lists: Query<(
         &mut ListWheel,
         &mut ScrollPosition,
