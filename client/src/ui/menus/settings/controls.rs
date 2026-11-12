@@ -738,16 +738,16 @@ fn spawn_key_slot(commands: &mut Commands, slot: KeySlot) -> Entity {
         .observe(slot_key)
         .observe(slot_click)
         // pressed while a mouse button is down on it, as a button is
-        .observe(|press: On<Pointer<Press>>, mut commands: Commands| {
+        .observe(|press: On<PointerPress>, mut commands: Commands| {
             commands.entity(press.entity).insert(Pressed);
         })
-        .observe(|release: On<Pointer<Release>>, mut commands: Commands| {
+        .observe(|release: On<PointerRelease>, mut commands: Commands| {
             commands.entity(release.entity).remove::<Pressed>();
         })
-        .observe(|drag_end: On<Pointer<DragEnd>>, mut commands: Commands| {
+        .observe(|drag_end: On<PointerDragEnd>, mut commands: Commands| {
             commands.entity(drag_end.entity).remove::<Pressed>();
         })
-        .observe(|cancel: On<Pointer<Cancel>>, mut commands: Commands| {
+        .observe(|cancel: On<PointerCancel>, mut commands: Commands| {
             commands.entity(cancel.entity).remove::<Pressed>();
         })
         .observe(show_focused_row)
@@ -965,7 +965,7 @@ fn slot_key(
 
 /// A left click on a slot starts its capture; a right click clears it.
 fn slot_click(
-    mut click: On<Pointer<Click>>,
+    mut click: On<PointerClick>,
     slots: Query<&KeySlot>,
     mut capture: ResMut<KeyCapture>,
     mut key_map: ResMut<KeyMap>,
