@@ -308,11 +308,39 @@ impl WeatherShading {
             ..self
         }
     }
+
+    /// The floats of the buffer on the GPU: the fields in order, as the std140 / std430 layout
+    /// of the struct has them, the eight `Vec4`s and the five `f32`s, then the zeros that pad
+    /// the struct out to a multiple of 16 bytes. Bevy 0.20 takes a `Vec` of plain data for a
+    /// `ShaderBuffer` and no longer lays out a `ShaderType`, so the layout is written out here;
+    /// a test checks its size against the one `ShaderType` computes.
+    pub fn to_gpu(&self) -> Vec<f32> {
+        let mut data = Vec::with_capacity(GPU_FLOATS);
+        for vector in [
+            self.horizon,
+            self.zenith,
+            self.glow,
+            self.sun,
+            self.wind,
+            self.drift,
+            self.strike,
+            self.flash_dir,
+        ] {
+            data.extend_from_slice(&vector.to_array());
+        }
+        data.extend([self.overcast, self.rain, self.storm, self.flash, self.wetness]);
+        data.resize(GPU_FLOATS, 0.);
+        data
+    }
 }
+
+/// The floats in `WeatherShading::to_gpu`: 8 `Vec4`s and 5 `f32`s are 37, padded to 40 so that
+/// the size is a multiple of the 16 bytes the alignment of a `Vec4` asks for.
+const GPU_FLOATS: usize = 40;
 
 /// The buffer of `WeatherShading`, under a clear sky.
 pub fn new_weather_buffer() -> ShaderBuffer {
-    ShaderBuffer::from(WeatherShading::default())
+    ShaderBuffer::from(WeatherShading::default().to_gpu())
 }
 
 const OVERCAST_SHADER: Handle<Shader> = uuid_handle!("d3e5a7c1-4f2b-4b9e-8a61-7c0e9f3b5d24");
@@ -371,7 +399,8 @@ pub fn weather_shading_system(
     }
     if let Some(mut buffer) = buffers.get_mut(&materials.weather) {
         // The same size: the buffer on the GPU is written in place, and stays bound
-        buffer.set_data(shading);
+        buffer.clear();
+        buffer.extend_from_slice(&shading.to_gpu());
         *written = Some(shading);
     }
 }
@@ -711,9 +740,37 @@ mod tests {
         shading.with_drift(app.world().resource::<WindDrift>().0)
     }
 
-    fn buffer_data(app: &App, handle: &Handle<ShaderBuffer>) -> Option<Vec<u8>> {
+    /// What the buffer of `handle` holds: the data and the size of the buffer on the GPU, as
+    /// text, because the data of a `ShaderBuffer` is not comparable any other way.
+    fn buffer_data(app: &App, handle: &Handle<ShaderBuffer>) -> String {
         let buffers = app.world().resource::<Assets<ShaderBuffer>>();
-        buffers.get(handle).unwrap().data.clone()
+        format!("{:?}", buffers.get(handle).unwrap().data)
+    }
+
+    /// What a buffer holds that was made for `shading`, as `buffer_data` shows it.
+    fn gpu_data(shading: WeatherShading) -> String {
+        format!("{:?}", ShaderBuffer::from(shading.to_gpu()).data)
+    }
+
+    #[test]
+    fn the_floats_of_the_buffer_are_as_big_as_the_struct_the_shaders_read() {
+        let shading = WeatherShading::default();
+        assert_eq!(
+            (shading.to_gpu().len() * 4) as u64,
+            WeatherShading::min_size().get()
+        );
+        // the fields in order, then the padding
+        let shading = WeatherShading::new(STORM, 0.6, 0.3, NOON_IN_DAY, true)
+            .with_drift(Vec2::new(5., 7.));
+        let floats = shading.to_gpu();
+        assert_eq!(floats[0..4], shading.horizon.to_array());
+        assert_eq!(floats[20..24], shading.drift.to_array());
+        assert_eq!(floats[28..32], shading.flash_dir.to_array());
+        assert_eq!(
+            floats[32..37],
+            [shading.overcast, 0.6, shading.storm, 0., 0.3]
+        );
+        assert_eq!(floats[37..], [0., 0., 0.]);
     }
 
     #[test]
@@ -721,10 +778,7 @@ mod tests {
         let (mut app, handle) = app(ShaderQuality::High, WeatherKind::Rain);
         let expected = drifted(&app, WeatherShading::new(RAIN, 1., 1., NOON_IN_DAY, true));
         assert_eq!(expected.overcast, 1.);
-        assert_eq!(
-            buffer_data(&app, &handle),
-            ShaderBuffer::from(expected).data
-        );
+        assert_eq!(buffer_data(&app, &handle), gpu_data(expected));
         // without the physical sky, the grey of the colour behind the world
         app.insert_resource(GraphicsSettings {
             shaders: ShaderQuality::Off,
@@ -732,10 +786,7 @@ mod tests {
         });
         app.update();
         let expected = drifted(&app, WeatherShading::new(RAIN, 1., 0., NOON_IN_DAY, false));
-        assert_eq!(
-            buffer_data(&app, &handle),
-            ShaderBuffer::from(expected).data
-        );
+        assert_eq!(buffer_data(&app, &handle), gpu_data(expected));
         assert_eq!(app.world().resource::<MaterialResource>().weather, handle);
     }
 
@@ -809,10 +860,7 @@ mod tests {
         let drift = app.world().resource::<WindDrift>().0;
         assert!(drift.x > 0., "{drift}");
         let expected = WeatherShading::new(STORM, 1., 1., NOON_IN_DAY, true).with_drift(drift);
-        assert_eq!(
-            buffer_data(&app, &handle),
-            ShaderBuffer::from(expected).data
-        );
+        assert_eq!(buffer_data(&app, &handle), gpu_data(expected));
     }
 
     #[test]
@@ -877,7 +925,7 @@ mod tests {
             );
             assert_eq!(
                 buffer_data(&app, &handle),
-                ShaderBuffer::from(expected).data,
+                gpu_data(expected),
                 "{quality:?}"
             );
         }
