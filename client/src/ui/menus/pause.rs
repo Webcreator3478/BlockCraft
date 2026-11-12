@@ -507,7 +507,11 @@ fn show_leaving(
     }
     for children in &menus {
         let mut bars = hints.iter_many_mut(children);
-        while let Some(mut visibility) = bars.fetch_next() {
+        while let Some(bar) = bars.fetch_next() {
+            // the children that are not hint bars are skipped
+            let Ok(mut visibility) = bar else {
+                continue;
+            };
             visibility.set_if_neq(Visibility::Hidden);
         }
     }
