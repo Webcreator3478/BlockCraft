@@ -493,7 +493,7 @@ fn set_biome_blend(
 /// Saves the video settings when the button is released on a slider: a click on the track
 /// sets a value that the widget never reports as final.
 fn save_on_release(
-    _: On<Pointer<Release>>,
+    _: On<PointerRelease>,
     video: (
         Res<RenderDistance>,
         Res<CloudStyle>,
