@@ -215,7 +215,7 @@ pub fn setup_chat(mut commands: Commands, asset_server: Res<AssetServer>) {
         .observe(recall_on_arrows)
         .observe(close_chat_on::<Submit>)
         .observe(hide_suggestions_or_close_chat)
-        .observe(close_chat_on::<FocusLost>);
+        .observe(close_chat_on_focus_lost);
     spawn_command_completion(&mut commands, field, &asset_server);
 }
 
@@ -653,14 +653,16 @@ fn send_chat_message(
 }
 
 /// Escape in the field puts the suggestions of the completion away while they show, and else
-/// closes the chat.
+/// closes the chat. Since Bevy 0.20 Escape has cleared the focus of the field by now: while the
+/// suggestions only go away, the field takes it back, so that the chat stays open and typing
+/// goes on.
 fn hide_suggestions_or_close_chat(
     cancel: On<Cancel>,
     mut completions: Query<&mut CommandCompletion>,
     chat_root: Query<(&mut Visibility, &mut SentMessages), With<ChatRoot>>,
     texts: Query<&mut EditableText>,
     logs: Query<&mut ScrollPosition, With<ChatLog>>,
-    focus: ResMut<InputFocus>,
+    mut focus: ResMut<InputFocus>,
 ) {
     let input = cancel.entity;
     if let Ok(mut completion) = completions.get_mut(input) {
@@ -670,13 +672,16 @@ fn hide_suggestions_or_close_chat(
                 .map(|text| text.value().to_string())
                 .unwrap_or_default();
             completion.dismiss(&value);
+            if focus.get() != Some(input) {
+                focus.set(input, FocusCause::Navigated);
+            }
             return;
         }
     }
     close_chat(input, chat_root, texts, logs, focus);
 }
 
-/// Closes the chat when its field is submitted or loses the focus.
+/// Closes the chat when its field is submitted.
 fn close_chat_on<E: EntityEvent>(
     event: On<E>,
     chat_root: Query<(&mut Visibility, &mut SentMessages), With<ChatRoot>>,
@@ -685,6 +690,29 @@ fn close_chat_on<E: EntityEvent>(
     focus: ResMut<InputFocus>,
 ) {
     close_chat(event.event_target(), chat_root, texts, logs, focus);
+}
+
+/// Closes the chat when its field loses the focus, except on the Escape that only puts the
+/// suggestions away: Bevy 0.20 clears the focus on Escape itself, and `hide_suggestions_or_close_chat`
+/// gives it back. The key is still pressed in this frame when the focus goes.
+fn close_chat_on_focus_lost(
+    lost: On<FocusLost>,
+    keys: Res<ButtonInput<KeyCode>>,
+    completions: Query<&CommandCompletion>,
+    chat_root: Query<(&mut Visibility, &mut SentMessages), With<ChatRoot>>,
+    texts: Query<&mut EditableText>,
+    logs: Query<&mut ScrollPosition, With<ChatLog>>,
+    focus: ResMut<InputFocus>,
+) {
+    let input = lost.event_target();
+    let only_hides_suggestions = keys.just_pressed(KeyCode::Escape)
+        && completions
+            .get(input)
+            .is_ok_and(CommandCompletion::is_shown);
+    if only_hides_suggestions {
+        return;
+    }
+    close_chat(input, chat_root, texts, logs, focus);
 }
 
 /// Closes the chat of the field `input`: the chat is hidden, its field emptied and unfocused, and
