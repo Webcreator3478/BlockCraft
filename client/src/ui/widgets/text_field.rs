@@ -236,10 +236,16 @@ pub(super) fn plugin(app: &mut App) {
     );
 }
 
-/// Whether the focus is in a text field: it takes Escape for itself, so the Escape handlers of the
-/// screen behind it stand down.
-pub fn text_field_focused(focus: Res<InputFocus>, fields: Query<(), With<EditableText>>) -> bool {
-    focus.get().is_some_and(|entity| fields.contains(entity))
+/// Whether the focus is in a text field, or a field took Enter or Escape in this update: it takes
+/// Escape for itself, so the Escape handlers of the screen behind it stand down. Since Bevy 0.20
+/// Escape clears the focus of the field itself, before the systems of `Update` run: the request
+/// that the field keeps until `PostUpdate` stands in for the focus it no longer has.
+pub fn text_field_focused(
+    focus: Res<InputFocus>,
+    fields: Query<(), With<EditableText>>,
+    requests: Query<(), With<FieldRequest>>,
+) -> bool {
+    focus.get().is_some_and(|entity| fields.contains(entity)) || !requests.is_empty()
 }
 
 /// Replaces the value of a field with `value`.
@@ -258,7 +264,8 @@ pub fn value_of(texts: &Query<&EditableText>, input: Entity) -> String {
 
 /// Asks for a Submit on Enter and for a Cancel on Escape. They are triggered in `PostUpdate`,
 /// after the edits of this update: a character typed in the same update as Enter is submitted,
-/// and the systems of `Update` still see the field focused in the update of the key.
+/// and the systems of `Update` still see a field at work in the update of the key
+/// (`text_field_focused`).
 fn request_on_enter_or_escape(
     mut event: On<FocusedInput<KeyboardInput>>,
     texts: Query<&EditableText>,
@@ -376,5 +383,19 @@ mod tests {
         assert!(!focused(&mut world));
         world.insert_resource(InputFocus::from_entity(field));
         assert!(focused(&mut world));
+    }
+
+    #[test]
+    fn a_field_that_took_escape_is_seen_though_bevy_cleared_its_focus() {
+        let mut world = World::new();
+        world.init_resource::<InputFocus>();
+        let field = world.spawn(EditableText::default()).id();
+        let focused = |world: &mut World| world.run_system_once(text_field_focused).unwrap();
+        assert!(!focused(&mut world));
+        // the focus is gone, the request stays until the field has emitted it
+        world.entity_mut(field).insert(FieldRequest::Cancel);
+        assert!(focused(&mut world));
+        world.entity_mut(field).remove::<FieldRequest>();
+        assert!(!focused(&mut world));
     }
 }
