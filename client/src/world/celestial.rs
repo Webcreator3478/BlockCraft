@@ -5,7 +5,7 @@ use crate::world::time::ClientTime;
 use crate::world::weather::ClientWeather;
 use crate::world::{GraphicsSettings, ShaderQuality};
 use bevy::{
-    asset::{load_internal_asset, uuid_handle},
+    asset::embedded_asset,
     camera::visibility::NoFrustumCulling,
     light::{NotShadowCaster, NotShadowReceiver},
     mesh::MeshVertexBufferLayoutRef,
@@ -63,16 +63,19 @@ const PHYSICAL_SKY_INTENSITY: f32 = 4.;
 /// How many days the moon takes to wax and wane.
 const MOON_CYCLE_DAYS: u64 = 8;
 
-const CELESTIAL_SHADER: Handle<Shader> = uuid_handle!("6c1e7f52-3a9d-4b20-8e6f-0d4c5b9a2e17");
+/// The shader of the sun, the moon and the stars, embedded in the game by
+/// `celestial_material_plugin`: the path of its file in the crate, `celestial.wesl` in
+/// `client/src/world`.
+const CELESTIAL_SHADER: &str = "embedded://client/world/celestial.wesl";
 
-/// What `celestial.wgsl` draws: the sun, the moon or the stars, added to the sky behind them.
+/// What `celestial.wesl` draws: the sun, the moon or the stars, added to the sky behind them.
 #[derive(Asset, TypePath, AsBindGroup, Clone, Debug)]
 pub struct CelestialMaterial {
     #[uniform(0)]
     pub params: CelestialParams,
 }
 
-/// `CelestialParams` in `celestial.wgsl`.
+/// `CelestialParams` in `celestial.wesl`.
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct CelestialParams {
     /// `CelestialKind` as a number.
@@ -146,7 +149,8 @@ impl Material for CelestialMaterial {
 
 /// Makes `CelestialMaterial` drawable.
 pub fn celestial_material_plugin(app: &mut App) {
-    load_internal_asset!(app, CELESTIAL_SHADER, "celestial.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads a shader of the game as an embedded asset
+    embedded_asset!(app, "celestial.wesl");
     app.add_plugins(MaterialPlugin::<CelestialMaterial>::default());
 }
 
