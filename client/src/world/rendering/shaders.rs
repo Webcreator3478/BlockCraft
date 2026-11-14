@@ -16,7 +16,7 @@
 
 use bevy::anti_alias::smaa::Smaa;
 use bevy::anti_alias::taa::TemporalAntiAliasing;
-use bevy::asset::{load_internal_asset, uuid_handle, RenderAssetUsages};
+use bevy::asset::{embedded_asset, RenderAssetUsages};
 use bevy::camera::{Exposure, Hdr};
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::light::atmosphere::ScatteringMedium;
@@ -28,7 +28,7 @@ use bevy::light::{
 use bevy::mesh::{Indices, MeshVertexBufferLayoutRef, PrimitiveTopology};
 use bevy::pbr::{
     AtmosphereSettings, MaterialPipeline, MaterialPipelineKey, ScreenSpaceAmbientOcclusion,
-    ScreenSpaceAmbientOcclusionQualityLevel,
+    ScreenSpaceAmbientOcclusionQualityLevel, ScreenSpaceTransmission,
 };
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
@@ -81,7 +81,7 @@ pub struct ShaderFeatures {
     pub shadow_map: usize,
     pub shadow_distance: f32,
     pub first_shadow_cascade: f32,
-    /// Whether the rain wets the world: darker, glossy ground and puddles (`chunk.wgsl`).
+    /// Whether the rain wets the world: darker, glossy ground and puddles (`chunk.wesl`).
     pub wet: bool,
 }
 
@@ -172,7 +172,7 @@ const NIGHT_AMBIENT_COLOR: Color = Color::srgb(0.62, 0.72, 1.);
 const SATURATION: f32 = 1.12;
 
 /// The bit of `ChunkShading::effects` by which the water reflects the screen and refracts what
-/// lies under it (`chunk.wgsl`).
+/// lies under it (`chunk.wesl`).
 pub const EFFECT_SSR: u32 = 4;
 
 /// The exposure of the camera with the physical sky and the sun at `sun_height`, as the sine
@@ -191,10 +191,13 @@ fn light_scale(ev100: f32) -> f32 {
     2f32.powf(ev100 - BASE_EV100)
 }
 
-const HORIZON_SHADER: Handle<Shader> = uuid_handle!("b6a2d0f4-91c3-4e57-8d1a-5c7e2f90a3b4");
+/// The shader of the horizon skirt, embedded in the game by `shaders_plugin`: the path of its
+/// file in the crate, `horizon.wesl` in `client/src/world/rendering`.
+const HORIZON_SHADER: &str = "embedded://client/world/rendering/horizon.wesl";
 
 pub fn shaders_plugin(app: &mut App) {
-    load_internal_asset!(app, HORIZON_SHADER, "horizon.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads a shader of the game as an embedded asset
+    embedded_asset!(app, "horizon.wesl");
     app.add_plugins(MaterialPlugin::<HorizonMaterial>::default())
         .init_resource::<DirectionalLightShadowMap>();
     // The time each pass takes on the GPU, for `bench_shaders`
@@ -273,6 +276,7 @@ fn apply_camera_features(
             MipBias,
             Smaa,
             ScreenSpaceAmbientOcclusion,
+            ScreenSpaceTransmission,
             VolumetricFog,
             DepthPrepass,
             NormalPrepass,
@@ -295,6 +299,12 @@ fn apply_camera_features(
         }
         if features.depth_prepass() {
             entity.insert(DepthPrepass);
+        }
+        if features.water {
+            // Bevy 0.20 no longer gives a camera the copy of the opaque faces that the water
+            // (`specular_transmission`) reflects and refracts: the camera asks for it, and
+            // `chunk.wesl` reads it where `VIEW_TRANSMISSION_TEXTURE` says it is there
+            entity.insert(ScreenSpaceTransmission::default());
         }
         if let Some(quality_level) = features.ambient_occlusion {
             entity.insert(ScreenSpaceAmbientOcclusion {
@@ -470,7 +480,7 @@ fn apply_water_features(
 }
 
 /// With the physical sky, above the water, the chunks fade into the sky itself, which
-/// `chunk.wgsl` reads from the environment map of the atmosphere where the fog is transparent;
+/// `chunk.wesl` reads from the environment map of the atmosphere where the fog is transparent;
 /// the atmosphere draws the sky over a black background. `underwater_fog_system` gives them
 /// back their colours without it.
 fn sky_fog(graphics: Res<GraphicsSettings>, mut cameras: Query<(&mut Camera, &mut DistanceFog)>) {
@@ -595,7 +605,7 @@ fn brighten_clouds(
 }
 
 /// The ring around the camera, under the horizon and past the chunks, of the colour of the sky
-/// at the horizon (`horizon.wgsl`): without it, the ground of the planet of the atmosphere
+/// at the horizon (`horizon.wesl`): without it, the ground of the planet of the atmosphere
 /// would show there.
 #[derive(Asset, TypePath, AsBindGroup, Clone, Debug)]
 pub struct HorizonMaterial {
