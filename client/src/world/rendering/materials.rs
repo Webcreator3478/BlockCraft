@@ -6,7 +6,7 @@ use crate::world::overcast::new_weather_buffer;
 use crate::world::precipitation::occlusion::OcclusionMap;
 use crate::world::voxel::FaceColor;
 use crate::world::{new_climate_map, GlobalMaterial, GraphicsSettings, BLOCK_LIGHT};
-use bevy::asset::{load_internal_asset, uuid_handle, RenderAssetUsages};
+use bevy::asset::{embedded_asset, load_embedded_asset, RenderAssetUsages};
 use bevy::image::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor};
 use bevy::pbr::{ExtendedMaterial, MaterialExtension};
 use bevy::prelude::*;
@@ -50,7 +50,7 @@ impl AtlasWrapper {
 }
 
 /// The block textures, each in one layer of a texture array, or in several for an animated
-/// one: a chunk mesh names the texture of each vertex by its index in the table of `chunk.wgsl`
+/// one: a chunk mesh names the texture of each vertex by its index in the table of `chunk.wesl`
 /// (`UV_1.x`), and the point in it in `UV_0`, which repeats past 1.
 #[derive(Debug)]
 pub struct BlockTextures {
@@ -62,7 +62,7 @@ pub struct BlockTextures {
     pub looks: Arc<BlockLooks>,
 }
 
-/// The most block textures a texture pack may have: the length of the table in `chunk.wgsl`.
+/// The most block textures a texture pack may have: the length of the table in `chunk.wesl`.
 pub const MAX_TILES: usize = 256;
 
 /// How an animated texture, a vertical strip of square frames, plays: read from the file
@@ -85,7 +85,7 @@ impl Default for TextureAnimation {
     }
 }
 
-/// How the surface of a block texture takes the rain (`chunk.wgsl`): how much it darkens, how
+/// How the surface of a block texture takes the rain (`chunk.wesl`): how much it darkens, how
 /// glossy it turns and whether puddles gather on it. Its value is kept in the table of the
 /// textures, over the bit of the fading of the frames.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -122,7 +122,7 @@ impl WetSurface {
     }
 }
 
-/// The row of a texture in the table of `chunk.wgsl`: its first layer, its number of frames,
+/// The row of a texture in the table of `chunk.wesl`: its first layer, its number of frames,
 /// how long a frame is shown, and whether a frame fades into the next, with its surface over
 /// that bit.
 fn table_row(layer: u32, frames: u32, animation: TextureAnimation, surface: WetSurface) -> UVec4 {
@@ -134,17 +134,21 @@ fn table_row(layer: u32, frames: u32, animation: TextureAnimation, surface: WetS
     )
 }
 
-const CHUNK_SHADER: Handle<Shader> = uuid_handle!("8d2b8c4e-6a51-4f7e-9b0c-3e5f1a7d9c21");
-/// `rustcraft::sky`, which `chunk.wgsl` imports.
-const SKY_SHADER: Handle<Shader> = uuid_handle!("3f0c9a61-27d4-4b8e-a5c2-9e41d7b06f18");
-/// `rustcraft::weather`, which `rustcraft::sky` and the precipitation import.
-const WEATHER_SHADER: Handle<Shader> = uuid_handle!("6b1e8f20-3c7d-4a95-b2e4-0d9f5a7c1e63");
+/// The chunk shader, embedded in the game by `chunk_material_plugin`: the path of its file in
+/// the crate, `chunk.wesl` in `client/src/world/rendering`.
+const CHUNK_SHADER: &str = "embedded://client/world/rendering/chunk.wesl";
+
+/// The shader modules that `chunk.wesl` and the precipitation import (`sky.wesl`, which imports
+/// `weather.wesl`): they have no entry point, so nothing refers to them but the imports, and
+/// the handles keep them loaded.
+#[derive(Resource)]
+struct ShaderLibraries(#[allow(dead_code)] Vec<Handle<Shader>>);
 
 /// What the chunks are drawn with: the material of the block textures, which repeat over the
 /// faces that span several blocks.
 pub type ChunkMaterial = ExtendedMaterial<StandardMaterial, BlockLayers>;
 
-/// The block textures for `chunk.wgsl`: the array of their layers, and for each texture of the
+/// The block textures for `chunk.wesl`: the array of their layers, and for each texture of the
 /// table its first layer, its number of frames, the time of a frame and whether frames fade.
 /// With them, what the grass and the leaves are coloured with: the climate around the player
 /// and the colour maps of the texture pack (see `climate.rs`), how the faces are shaded, and
@@ -179,7 +183,7 @@ pub struct BlockLayers {
 pub const EFFECT_SWAY: u32 = 1;
 pub const EFFECT_WATER: u32 = 2;
 
-/// How `chunk.wgsl` shades the faces, from the graphics settings (`GraphicsSettings`). Changing
+/// How `chunk.wesl` shades the faces, from the graphics settings (`GraphicsSettings`). Changing
 /// it makes Bevy prepare every chunk drawn again: it only changes with a setting.
 #[derive(ShaderType, Clone, Copy, Debug, PartialEq)]
 pub struct ChunkShading {
@@ -237,9 +241,17 @@ impl MaterialExtension for BlockLayers {
 
 /// Makes `ChunkMaterial` drawable.
 pub fn chunk_material_plugin(app: &mut App) {
-    load_internal_asset!(app, WEATHER_SHADER, "weather.wgsl", Shader::from_wgsl);
-    load_internal_asset!(app, SKY_SHADER, "sky.wgsl", Shader::from_wgsl);
-    load_internal_asset!(app, CHUNK_SHADER, "chunk.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads the shaders of the game as embedded assets, at
+    // `embedded://client/world/rendering/<name>.wesl`, and a module is imported by that path:
+    // `client::world::rendering::sky`
+    embedded_asset!(app, "weather.wesl");
+    embedded_asset!(app, "sky.wesl");
+    embedded_asset!(app, "chunk.wesl");
+    let libraries = vec![
+        load_embedded_asset!(app, "weather.wesl"),
+        load_embedded_asset!(app, "sky.wesl"),
+    ];
+    app.insert_resource(ShaderLibraries(libraries));
     app.add_plugins(MaterialPlugin::<ChunkMaterial>::default());
 }
 
