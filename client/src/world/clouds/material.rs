@@ -1,5 +1,5 @@
 use bevy::{
-    asset::{load_internal_asset, uuid_handle},
+    asset::embedded_asset,
     mesh::MeshVertexBufferLayoutRef,
     pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
@@ -13,10 +13,12 @@ use bevy::{
 
 use super::mesh::{ATTRIBUTE_DENSITIES, ATTRIBUTE_SHADE};
 
-const CLOUDS_SHADER: Handle<Shader> = uuid_handle!("3f6c1d2a-9b7e-4c58-a1d0-5e2b8f4c7a93");
+/// The shader of the clouds, embedded in the game by `cloud_material_plugin`: the path of its
+/// file in the crate, `clouds.wesl` in `client/src/world/clouds`.
+const CLOUDS_SHADER: &str = "embedded://client/world/clouds/clouds.wesl";
 
 /// What the clouds are drawn with: unlit, seen from both sides, faded out with the horizontal
-/// distance to the camera (`clouds.wgsl`).
+/// distance to the camera (`clouds.wesl`).
 ///
 /// Blended faces behind one another would add up, a cloud seen through its own faces looking
 /// thicker than one seen through a single face. So the clouds are drawn twice, as Minecraft
@@ -48,7 +50,7 @@ impl From<&CloudMaterial> for CloudKey {
     }
 }
 
-/// The uniforms of `clouds.wgsl`.
+/// The uniforms of `clouds.wesl`.
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct CloudParams {
     /// The colour of the top faces, in linear RGB; the other faces are darker.
@@ -129,6 +131,7 @@ impl Material for CloudMaterial {
 
 /// Makes `CloudMaterial` drawable.
 pub fn cloud_material_plugin(app: &mut App) {
-    load_internal_asset!(app, CLOUDS_SHADER, "clouds.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads a shader of the game as an embedded asset
+    embedded_asset!(app, "clouds.wesl");
     app.add_plugins(MaterialPlugin::<CloudMaterial>::default());
 }
