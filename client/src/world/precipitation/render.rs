@@ -1,4 +1,4 @@
-//! The pass that draws the rain, the snow and the splashes (`precipitation.wgsl`): no mesh and
+//! The pass that draws the rain, the snow and the splashes (`precipitation.wesl`): no mesh and
 //! no entity, every drop placed and moved by the vertex shader from its index and the time.
 //!
 //! It runs in Bevy's `Core3d` schedule after the TAA and before the bloom and the tonemapping,
@@ -9,7 +9,7 @@
 //! MSAA).
 
 use bevy::anti_alias::taa::temporal_anti_alias;
-use bevy::asset::{load_internal_asset, uuid_handle};
+use bevy::asset::{embedded_asset, load_embedded_asset};
 use bevy::core_pipeline::schedule::{Core3d, Core3dSystems};
 use bevy::prelude::*;
 use bevy::render::{
@@ -41,8 +41,6 @@ use bevy::shader::Shader;
 
 use crate::world::overcast::WeatherShading;
 
-const PRECIPITATION_SHADER: Handle<Shader> = uuid_handle!("a4c7e2d9-58b1-4f03-9e6a-2d71c0b8f5e4");
-
 /// Marks the camera that the rain and the snow are drawn for: the camera of the player, whose
 /// depth texture is made readable for them.
 #[derive(Component, Clone, Copy, Default, ExtractComponent)]
@@ -50,7 +48,7 @@ const PRECIPITATION_SHADER: Handle<Shader> = uuid_handle!("a4c7e2d9-58b1-4f03-9e
 pub struct PrecipitationView;
 
 /// How many drops of each kind the pass draws at most, and of them how many to show: the
-/// uniforms of `precipitation.wgsl`.
+/// uniforms of `precipitation.wesl`.
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct PrecipitationParams {
     /// The drops of rain, the flakes of snow and the splashes the pass holds.
@@ -65,7 +63,7 @@ pub struct PrecipitationParams {
     pub sheets: u32,
 }
 
-/// The segments of a sheet of rain around the eye, each a quad (`precipitation.wgsl`).
+/// The segments of a sheet of rain around the eye, each a quad (`precipitation.wesl`).
 pub const SHEET_SEGMENTS: u32 = 48;
 
 impl PrecipitationParams {
@@ -93,12 +91,9 @@ pub struct PrecipitationSources {
 
 /// The pass of the rain and the snow, in the render world.
 pub fn precipitation_render_plugin(app: &mut App) {
-    load_internal_asset!(
-        app,
-        PRECIPITATION_SHADER,
-        "precipitation.wgsl",
-        Shader::from_wgsl
-    );
+    // Bevy 0.20 loads a shader of the game as an embedded asset, at
+    // `embedded://client/world/precipitation/precipitation.wesl`
+    embedded_asset!(app, "precipitation.wesl");
     app.init_resource::<PrecipitationDraw>().add_plugins((
         ExtractResourcePlugin::<PrecipitationDraw>::default(),
         ExtractComponentPlugin::<PrecipitationView>::default(),
@@ -126,15 +121,16 @@ pub fn precipitation_render_plugin(app: &mut App) {
 }
 
 /// The layouts of the bind group of the pass, with the depth of a view drawn without MSAA and
-/// with it, and the pipelines made from them.
+/// with it, its shader, and the pipelines made from them.
 #[derive(Resource)]
 pub struct PrecipitationPipeline {
     layout: BindGroupLayoutDescriptor,
     multisampled_layout: BindGroupLayoutDescriptor,
+    shader: Handle<Shader>,
 }
 
 impl FromWorld for PrecipitationPipeline {
-    fn from_world(_world: &mut World) -> Self {
+    fn from_world(world: &mut World) -> Self {
         let layout = |multisampled: bool| {
             let depth = if multisampled {
                 texture_depth_2d_multisampled()
@@ -160,6 +156,7 @@ impl FromWorld for PrecipitationPipeline {
         Self {
             layout: layout(false),
             multisampled_layout: layout(true),
+            shader: load_embedded_asset!(world, "precipitation.wesl"),
         }
     }
 }
@@ -187,14 +184,14 @@ impl SpecializedRenderPipeline for PrecipitationPipeline {
             label: Some("precipitation_pipeline".into()),
             layout: vec![layout],
             vertex: VertexState {
-                shader: PRECIPITATION_SHADER,
+                shader: self.shader.clone(),
                 shader_defs: shader_defs.clone(),
                 entry_point: Some("vertex".into()),
                 buffers: vec![],
                 constants: vec![],
             },
             fragment: Some(FragmentState {
-                shader: PRECIPITATION_SHADER,
+                shader: self.shader.clone(),
                 shader_defs,
                 entry_point: Some("fragment".into()),
                 targets: vec![Some(ColorTargetState {
