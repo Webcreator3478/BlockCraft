@@ -29,8 +29,9 @@ import bevy_pbr::render::view_transformations::position_world_to_clip;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::mesh_view_bindings::globals;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::mesh_view_bindings::lights;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::mesh_view_bindings::view;
-@if(!PREPASS_PIPELINE) import bevy_pbr::render::mesh_view_bindings::view_transmission_texture;
-@if(!PREPASS_PIPELINE) import bevy_pbr::render::mesh_view_bindings::view_transmission_sampler;
+// Bevy 0.20 declares these only for a camera with `ScreenSpaceTransmission`
+@if(!PREPASS_PIPELINE && VIEW_TRANSMISSION_TEXTURE) import bevy_pbr::render::mesh_view_bindings::view_transmission_texture;
+@if(!PREPASS_PIPELINE && VIEW_TRANSMISSION_TEXTURE) import bevy_pbr::render::mesh_view_bindings::view_transmission_sampler;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::pbr_functions::apply_pbr_lighting;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::pbr_functions::main_pass_post_lighting_processing;
 @if(!PREPASS_PIPELINE) import bevy_pbr::render::pbr_types::STANDARD_MATERIAL_FLAGS_UNLIT_BIT;
@@ -50,8 +51,6 @@ import bevy_pbr::render::view_transformations::position_world_to_clip;
 @if(!PREPASS_PIPELINE) import client::world::rendering::sky::weather;
 @if(!PREPASS_PIPELINE) import client::world::rendering::weather::FLASH_COLOR;
 @if(!PREPASS_PIPELINE && DEPTH_PREPASS) import bevy_pbr::prepass::utils::prepass_depth;
-
-
 
 // Bound to the prepass too, where `mesh_view_bindings` has other bindings
 @if(PREPASS_PIPELINE) @group(0) @binding(1) var<uniform> globals: Globals;
@@ -203,9 +202,12 @@ fn vertex(vertex: Vertex) -> VertexOutput {
         world_from_local,
         vec4<f32>(vertex.position, 1.0),
     );
+    // declared here, set in the block below, and read by the motion vectors further on: a
+    // variable declared inside a conditional block would end with it
+    var sway = 0u;
 @if(VERTEX_UVS_A) {
 @if(VERTEX_UVS_B) {
-    let sway = colouring_of(vertex.uv_b).sway;
+    sway = colouring_of(vertex.uv_b).sway;
     world_position = vec4(world_position.xyz + sway_offset(sway, vertex.uv, world_position.xyz), 1.0);
 }
 }
@@ -760,8 +762,9 @@ fn fragment(in: VertexOutput) {
     return prepass_depth(vec4(pixel, 0.0, 0.0), 0u);
 }
 
-// What the screen shows of the opaque faces at `uv`, before the water.
-@if(!PREPASS_PIPELINE && DEPTH_PREPASS) fn opaque_color(uv: vec2<f32>) -> vec3<f32> {
+// What the screen shows of the opaque faces at `uv`, before the water. The transmission texture
+// is there for a camera with `ScreenSpaceTransmission` only.
+@if(!PREPASS_PIPELINE && DEPTH_PREPASS && VIEW_TRANSMISSION_TEXTURE) fn opaque_color(uv: vec2<f32>) -> vec3<f32> {
     return textureSampleLevel(view_transmission_texture, view_transmission_sampler, uv, 0.0).rgb;
 }
 
@@ -769,7 +772,7 @@ fn fragment(in: VertexOutput) {
 // the screen-space reflections of shader packs: steps that grow with the distance, then a
 // binary search between the last two. Nothing where the ray leaves the screen or passes
 // behind a face too thick to be the one it hits.
-@if(!PREPASS_PIPELINE && DEPTH_PREPASS) fn screen_reflection(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
+@if(!PREPASS_PIPELINE && DEPTH_PREPASS && VIEW_TRANSMISSION_TEXTURE) fn screen_reflection(origin: vec3<f32>, dir: vec3<f32>) -> vec4<f32> {
     var before = 0.0;
     var t = 0.4;
     for (var i = 0; i < 40; i++) {
@@ -813,7 +816,7 @@ fn fragment(in: VertexOutput) {
 // by the waves and absorbed by the depth of water (red first), then what it reflects, the
 // screen where it can, the sky elsewhere, with a glint of the sun. `body` is the colour the
 // water scatters, `sky` how much of the sky reaches it.
-@if(!PREPASS_PIPELINE && DEPTH_PREPASS) fn water_surface(in: VertexOutput, N: vec3<f32>, V: vec3<f32>, body: vec3<f32>, sky: f32) -> vec3<f32> {
+@if(!PREPASS_PIPELINE && DEPTH_PREPASS && VIEW_TRANSMISSION_TEXTURE) fn water_surface(in: VertexOutput, N: vec3<f32>, V: vec3<f32>, body: vec3<f32>, sky: f32) -> vec3<f32> {
     let uv = (in.position.xy - view.viewport.xy) / view.viewport.zw;
     let surface_z = position_world_to_view(in.world_position.xyz).z;
     // The waves bend what lies under them, less from far
@@ -876,12 +879,12 @@ fn fragment(
         let overlay = texture_color(colouring.overlay - 1u, in.uv);
         texture = vec4(mix(texture.rgb, overlay.rgb * color, overlay.a), texture.a);
     }
+    // declared here, set below: a variable declared inside a conditional block would end with it
+    var light = vec4(1.0, 0.0, 1.0, 1.0);
 @if(VERTEX_COLORS) {
-    let light = in.color;
+    light = in.color;
     // The standard material would colour the face with it
     in.color = vec4(1.0);
-} @else {
-    let light = vec4(1.0, 0.0, 1.0, 1.0);
 }
     var pbr_input = pbr_input_from_standard_material(in, is_front);
     pbr_input.material.base_color *= texture;
@@ -925,7 +928,12 @@ fn fragment(
             pbr_input.material.base_color.a,
         );
     }
-    pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
+    // In 0.20 `alpha_discard` takes the flags and the cutoff of the material, not the material
+    pbr_input.material.base_color = alpha_discard(
+        pbr_input.material.flags,
+        pbr_input.material.alpha_cutoff,
+        pbr_input.material.base_color,
+    );
 
     var out: FragmentOutput;
     if (pbr_input.material.flags & STANDARD_MATERIAL_FLAGS_UNLIT_BIT) == 0u {
@@ -966,7 +974,7 @@ fn fragment(
         }
         out.color = vec4(mix(out.color.rgb, reflected, fresnel), out.color.a);
     }
-@if(DEPTH_PREPASS) {
+@if(DEPTH_PREPASS && VIEW_TRANSMISSION_TEXTURE) {
     if screen_water {
         if is_front {
             out.color = vec4(water_surface(in, pbr_input.N, pbr_input.V, out.color.rgb * 0.5, sky), 1.0);
@@ -990,4 +998,3 @@ fn fragment(
     out.color = main_pass_post_lighting_processing(pbr_input, out.color);
     return out;
 }
-
