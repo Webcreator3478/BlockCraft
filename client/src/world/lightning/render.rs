@@ -1,4 +1,4 @@
-//! The pass that draws the bolts of lightning (`lightning.wgsl`): the points of their channels
+//! The pass that draws the bolts of lightning (`lightning.wesl`): the points of their channels
 //! in a storage buffer, each piece of channel a ribbon facing the camera, joined to the next by
 //! a miter, with a hot core and a soft glow, added to the frame.
 //!
@@ -8,7 +8,7 @@
 //! With the shaders it is far brighter than white, and the bloom spreads it.
 
 use bevy::anti_alias::taa::temporal_anti_alias;
-use bevy::asset::{load_internal_asset, uuid_handle};
+use bevy::asset::{embedded_asset, load_embedded_asset};
 use bevy::core_pipeline::schedule::{Core3d, Core3dSystems};
 use bevy::prelude::*;
 use bevy::render::{
@@ -40,9 +40,7 @@ use crate::world::precipitation::render::PrecipitationView;
 use crate::world::shaders::ShaderFeatures;
 use crate::world::GraphicsSettings;
 
-const LIGHTNING_SHADER: Handle<Shader> = uuid_handle!("6e1f0b3c-27d4-4a8e-b5c9-d0a4f8e2c7b1");
-
-/// A point of a channel as the pass reads it (`BoltVertex` in `lightning.wgsl`).
+/// A point of a channel as the pass reads it (`BoltVertex` in `lightning.wesl`).
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct BoltVertex {
     pub position: Vec3,
@@ -57,7 +55,7 @@ pub struct BoltVertex {
 pub const FIRST: u32 = 1;
 pub const LAST: u32 = 2;
 
-/// The uniforms of `lightning.wgsl`.
+/// The uniforms of `lightning.wesl`.
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct LightningParams {
     /// How bright the core and the glow are drawn: far brighter than white with the shaders,
@@ -118,7 +116,9 @@ pub fn vertex_count(points: usize) -> u32 {
 /// The pass of the bolts, in the render world. It draws for the camera of the player, the
 /// `PrecipitationView` that the pass of the rain extracts.
 pub fn lightning_render_plugin(app: &mut App) {
-    load_internal_asset!(app, LIGHTNING_SHADER, "lightning.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads a shader of the game as an embedded asset, at
+    // `embedded://client/world/lightning/lightning.wesl`
+    embedded_asset!(app, "lightning.wesl");
     app.init_resource::<LightningDraw>()
         .add_plugins(ExtractResourcePlugin::<LightningDraw>::default())
         .add_systems(OnExit(GameState::Game), stop_drawing_lightning)
@@ -174,15 +174,16 @@ fn stop_drawing_lightning(mut draw: ResMut<LightningDraw>) {
 }
 
 /// The layouts of the bind group of the pass, with the depth of a view drawn without MSAA and
-/// with it.
+/// with it, and its shader.
 #[derive(Resource)]
 pub struct LightningPipeline {
     layout: BindGroupLayoutDescriptor,
     multisampled_layout: BindGroupLayoutDescriptor,
+    shader: Handle<Shader>,
 }
 
 impl FromWorld for LightningPipeline {
-    fn from_world(_world: &mut World) -> Self {
+    fn from_world(world: &mut World) -> Self {
         let layout = |multisampled: bool| {
             let depth = if multisampled {
                 texture_depth_2d_multisampled()
@@ -205,6 +206,7 @@ impl FromWorld for LightningPipeline {
         Self {
             layout: layout(false),
             multisampled_layout: layout(true),
+            shader: load_embedded_asset!(world, "lightning.wesl"),
         }
     }
 }
@@ -237,14 +239,14 @@ impl SpecializedRenderPipeline for LightningPipeline {
             label: Some("lightning_pipeline".into()),
             layout: vec![layout],
             vertex: VertexState {
-                shader: LIGHTNING_SHADER,
+                shader: self.shader.clone(),
                 shader_defs: shader_defs.clone(),
                 entry_point: Some("vertex".into()),
                 buffers: vec![],
                 constants: vec![],
             },
             fragment: Some(FragmentState {
-                shader: LIGHTNING_SHADER,
+                shader: self.shader.clone(),
                 shader_defs,
                 entry_point: Some("fragment".into()),
                 targets: vec![Some(ColorTargetState {
@@ -431,7 +433,7 @@ mod tests {
 
     #[test]
     fn the_bolt_is_drawn_after_the_taa_without_its_jitter() {
-        let source = include_str!("lightning.wgsl");
+        let source = include_str!("lightning.wesl");
         assert!(source.contains("view.unjittered_clip_from_world"));
         assert!(!source.contains("view.clip_from_world"));
     }
