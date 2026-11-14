@@ -11,10 +11,6 @@ import bevy_pbr::render::mesh_view_bindings::light_probes;
 import client::world::rendering::weather::Weather;
 import client::world::rendering::weather::FLASH_COLOR;
 
-
-
-
-
 // `WeatherShading` in `overcast.rs`
 @group(constants::MATERIAL_BIND_GROUP) @binding(107) var<storage, read> weather: Weather;
 
@@ -35,15 +31,18 @@ fn clear_sky_radiance(dir: vec3<f32>, blur: f32) -> vec3<f32> {
     var at = quat_rotate(light_probes.view_rotation, dir);
     // Cube maps are left-handed
     at.z = -at.z;
+    // declared here, set in the branches below: a variable declared inside a conditional block
+    // would end with it
+    var radiance: vec3<f32>;
 @if(MULTIPLE_LIGHT_PROBES_IN_ARRAY) {
     let index = light_probes.view_cubemap_index;
     let level = blur * f32(textureNumLevels(specular_environment_maps[index]) - 1u);
-    let radiance = textureSampleLevel(
+    radiance = textureSampleLevel(
         specular_environment_maps[index], environment_map_sampler, at, level,
     ).rgb;
 } @else {
     let level = blur * f32(light_probes.smallest_specular_mip_level_for_view);
-    let radiance = textureSampleLevel(specular_environment_map, environment_map_sampler, at, level).rgb;
+    radiance = textureSampleLevel(specular_environment_map, environment_map_sampler, at, level).rgb;
 }
     return radiance * view.exposure;
 } @else {
