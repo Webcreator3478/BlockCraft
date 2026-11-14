@@ -8,7 +8,7 @@
 //! and no blue is left. The buffer is written in place as the weather and the hour change:
 //! changing a material instead would prepare every chunk drawn again.
 
-use bevy::asset::{load_internal_asset, uuid_handle};
+use bevy::asset::embedded_asset;
 use bevy::camera::visibility::NoFrustumCulling;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::mesh::MeshVertexBufferLayoutRef;
@@ -202,12 +202,12 @@ impl Overcast {
 }
 
 /// The drift of the wind wraps around at this many blocks along x and z: a whole number of the
-/// sides of every box the drops of `precipitation.wgsl` wrap around in (18 and 48 for the rain,
+/// sides of every box the drops of `precipitation.wesl` wrap around in (18 and 48 for the rain,
 /// and 16, 40 and 80 for the snow, which drifts at `SNOW_DRIFT` of the wind), so that the wrap
 /// moves no drop, and small enough to keep the fraction of a block in an `f32`.
 pub const DRIFT_WRAP: f32 = 3600.;
 
-/// The part of the wind the snow drifts with (`precipitation.wgsl`).
+/// The part of the wind the snow drifts with (`precipitation.wesl`).
 #[cfg(test)]
 const SNOW_DRIFT: f32 = 0.8;
 
@@ -224,7 +224,7 @@ impl WindDrift {
     }
 }
 
-/// What the shaders of the sky know of the weather: `Weather` in `sky.wgsl`, bound at 107 in
+/// What the shaders of the sky know of the weather: `Weather` in `sky.wesl`, bound at 107 in
 /// every material that shows the sky.
 #[derive(ShaderType, Clone, Copy, Debug, Default, PartialEq)]
 pub struct WeatherShading {
@@ -343,11 +343,14 @@ pub fn new_weather_buffer() -> ShaderBuffer {
     ShaderBuffer::from(WeatherShading::default().to_gpu())
 }
 
-const OVERCAST_SHADER: Handle<Shader> = uuid_handle!("d3e5a7c1-4f2b-4b9e-8a61-7c0e9f3b5d24");
+/// The shader of the overcast dome, embedded in the game by `overcast_plugin`: the path of its
+/// file in the crate, `overcast.wesl` in `client/src/world/rendering`.
+const OVERCAST_SHADER: &str = "embedded://client/world/rendering/overcast.wesl";
 
 /// The overcast sky and the dome that draws it.
 pub fn overcast_plugin(app: &mut App) {
-    load_internal_asset!(app, OVERCAST_SHADER, "overcast.wgsl", Shader::from_wgsl);
+    // Bevy 0.20 loads a shader of the game as an embedded asset
+    embedded_asset!(app, "overcast.wesl");
     app.add_plugins(MaterialPlugin::<OvercastMaterial>::default())
         .init_resource::<WindDrift>()
         .add_systems(
@@ -405,7 +408,7 @@ pub fn weather_shading_system(
     }
 }
 
-/// The grey sky of the weather (`overcast.wgsl`), drawn over the physical sky by the overcast
+/// The grey sky of the weather (`overcast.wesl`), drawn over the physical sky by the overcast
 /// level: a sphere around the camera on the far plane, so that it covers the sky only. Bevy
 /// draws the sky after the opaque meshes, so the dome is among the transparent ones, after the
 /// sun, the moon and the stars and before the clouds.
@@ -826,9 +829,9 @@ mod tests {
         assert!(drift.0.x >= 0. && drift.0.x < DRIFT_WRAP && drift.0.y == 0.);
     }
 
-    /// The half sides of the boxes the bands of `function` in `precipitation.wgsl` wrap around.
+    /// The half sides of the boxes the bands of `function` in `precipitation.wesl` wrap around.
     fn band_extents(function: &str) -> Vec<f32> {
-        let source = include_str!("../precipitation/precipitation.wgsl");
+        let source = include_str!("../precipitation/precipitation.wesl");
         let body = source.split(&format!("fn {function}(")).nth(1).unwrap();
         let body = body.split("\n}").next().unwrap();
         body.split("Band(vec3(")
@@ -848,7 +851,7 @@ mod tests {
         for extent in snow {
             assert_eq!(SNOW_DRIFT * DRIFT_WRAP % (2. * extent), 0., "{extent}");
         }
-        let source = include_str!("../precipitation/precipitation.wgsl");
+        let source = include_str!("../precipitation/precipitation.wesl");
         assert!(source.contains(&format!("const SNOW_DRIFT: f32 = {SNOW_DRIFT:?};")));
     }
 
